@@ -1,0 +1,1 @@
+ALTER TABLE `quizzes` ADD `uploaded_by` text;

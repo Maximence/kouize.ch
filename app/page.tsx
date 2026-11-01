@@ -1,69 +1,125 @@
-import Image from "next/image";
+import { PlusIcon } from "lucide-react";
+import Link from "next/link";
+import { connection } from "next/server";
+import { Suspense } from "react";
+import { CategoryDialog } from "@/components/category-dialog";
+import { ClassesHome } from "@/components/classes-home";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { formatDate, formatScore, plural } from "@/lib/format";
+import { listCategories } from "@/lib/queries";
+import { isHosted } from "@/lib/settings";
 
-export default function Home() {
+export default function HomePage() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
+    <Suspense fallback={<CategoryGridSkeleton />}>
+      <Home />
+    </Suspense>
+  );
+}
+
+/** Online: the player's classes. On your computer: your studio. */
+async function Home() {
+  await connection();
+  return isHosted() ? <ClassesHome /> : <StudioHome />;
+}
+
+function StudioHome() {
+  return (
+    <div className="grid gap-8">
+      <section className="rounded-lg border bg-card px-6 py-8 sm:px-10 sm:py-10">
+        <div className="grid gap-4 sm:max-w-2xl">
+          <h1 className="text-4xl leading-tight sm:text-5xl">
+            Transforme tes notes en <span className="kouize-highlight">quiz</span> que tu vas vraiment aimer.
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="text-muted-foreground">
+            Dépose tes notes de cours, obtiens des questions tirées uniquement de celles-ci, et vois exactement quoi réviser.
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
+          <div className="flex flex-wrap gap-2">
+            <CategoryDialog
+              trigger={
+                <Button size="lg" className="px-5 font-semibold">
+                  <PlusIcon /> Nouvelle matière
+                </Button>
+              }
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            <Button size="lg" variant="outline" className="px-5 font-semibold" asChild>
+              <Link href="/review">Révision du jour</Link>
+            </Button>
+          </div>
         </div>
-      </main>
+      </section>
+      <h2 className="text-2xl font-semibold">Tes matières</h2>
+      <Suspense fallback={<CategoryGridSkeleton />}>
+        <CategoryGrid />
+      </Suspense>
+    </div>
+  );
+}
+
+async function CategoryGrid() {
+  const cats = await listCategories();
+  if (!cats.length) {
+    return (
+      <Card className="border-dashed bg-card/60">
+        <CardContent className="grid place-items-center gap-3 py-12 text-center">
+          <div className="text-5xl">📚</div>
+          <p className="font-heading text-lg">Pas encore de matière</p>
+          <p className="max-w-sm text-sm text-muted-foreground">
+            Crée une matière par cours, puis dépose-y tes notes <code>.md</code>. Essaie les fichiers de{" "}
+            <code>samples/</code> pour commencer.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {cats.map((c) => (
+        <Link key={c.id} href={`/c/${c.id}`} className="group" data-testid="category-card">
+          <Card className="h-full overflow-hidden transition-shadow group-hover:shadow-md">
+            <CardHeader>
+              <CardTitle className="flex items-start gap-3 text-lg">
+                <span
+                  className="grid size-12 shrink-0 place-items-center rounded-md text-2xl"
+                  style={{ backgroundColor: `${c.color}66` }}
+                >
+                  {c.emoji}
+                </span>
+                <span className="break-words">{c.name}</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                <Stat label="Fichiers" value={plural(c.fileCount, "fichier")} />
+                <Stat label="Quiz" value={plural(c.quizCount, "quiz", "quiz")} />
+                <Stat label="Score moyen" value={formatScore(c.avgScore)} />
+                <Stat label="Dernière révision" value={formatDate(c.lastStudied)} />
+              </dl>
+            </CardContent>
+          </Card>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="font-medium">{value}</dd>
+    </div>
+  );
+}
+
+function CategoryGridSkeleton() {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {[0, 1, 2].map((i) => (
+        <Skeleton key={i} className="h-40 rounded-lg" />
+      ))}
     </div>
   );
 }

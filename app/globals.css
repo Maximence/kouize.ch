@@ -1,26 +1,232 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  --text-sm: 0.9375rem;
+  --text-sm--line-height: 1.5;
+  --text-base: 1.0625rem;
+  --text-base--line-height: 1.6;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-sans);
   --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-display);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* KOUIZE theme: warm cream paper, deep ink, teal main color, coral / butter / mint pastel accents.
+   Flat colors only, and no pure white or black anywhere. */
+:root {
+  --series-score: #00897b;
+  --background: oklch(0.975 0.014 85);
+  --foreground: oklch(0.28 0.04 230);
+  --card: oklch(0.99 0.008 85);
+  --card-foreground: oklch(0.28 0.04 230);
+  --popover: oklch(0.99 0.008 85);
+  --popover-foreground: oklch(0.28 0.04 230);
+  --primary: oklch(0.52 0.09 195);
+  --primary-foreground: oklch(0.985 0.01 85);
+  --secondary: oklch(0.94 0.045 165);
+  --secondary-foreground: oklch(0.33 0.06 170);
+  --muted: oklch(0.95 0.016 85);
+  --muted-foreground: oklch(0.48 0.03 230);
+  --accent: oklch(0.93 0.05 40);
+  --accent-foreground: oklch(0.4 0.09 35);
+  --destructive: oklch(0.58 0.17 25);
+  --border: oklch(0.89 0.02 85);
+  --input: oklch(0.86 0.025 85);
+  --ring: oklch(0.65 0.09 195);
+  --chart-1: oklch(0.52 0.09 195);
+  --chart-2: oklch(0.7 0.14 35);
+  --chart-3: oklch(0.8 0.12 90);
+  --chart-4: oklch(0.7 0.1 165);
+  --chart-5: oklch(0.65 0.1 250);
+  --radius: 0.375rem;
+  /* flat pastel accents (tiles, highlights, badges) */
+  --pastel-mint: oklch(0.91 0.06 165);
+  --pastel-butter: oklch(0.93 0.09 95);
+  --pastel-sky: oklch(0.9 0.05 230);
+  --sidebar: oklch(0.97 0.014 85);
+  --sidebar-foreground: oklch(0.28 0.04 230);
+  --sidebar-primary: oklch(0.52 0.09 195);
+  --sidebar-primary-foreground: oklch(0.985 0.01 85);
+  --sidebar-accent: oklch(0.95 0.016 85);
+  --sidebar-accent-foreground: oklch(0.28 0.04 230);
+  --sidebar-border: oklch(0.89 0.02 85);
+  --sidebar-ring: oklch(0.65 0.09 195);
+}
+
+.dark {
+  --series-score: #0f9e93;
+  --background: oklch(0.22 0.03 230);
+  --foreground: oklch(0.95 0.015 85);
+  --card: oklch(0.26 0.033 230);
+  --card-foreground: oklch(0.95 0.015 85);
+  --popover: oklch(0.27 0.033 230);
+  --popover-foreground: oklch(0.95 0.015 85);
+  --primary: oklch(0.78 0.09 190);
+  --primary-foreground: oklch(0.22 0.04 230);
+  --secondary: oklch(0.33 0.05 170);
+  --secondary-foreground: oklch(0.92 0.04 165);
+  --muted: oklch(0.3 0.03 230);
+  --muted-foreground: oklch(0.76 0.025 230);
+  --accent: oklch(0.35 0.06 35);
+  --accent-foreground: oklch(0.92 0.04 40);
+  --destructive: oklch(0.72 0.15 25);
+  --border: oklch(0.36 0.035 230);
+  --input: oklch(0.4 0.04 230);
+  --ring: oklch(0.65 0.09 190);
+  --chart-1: oklch(0.78 0.09 190);
+  --chart-2: oklch(0.78 0.12 40);
+  --chart-3: oklch(0.85 0.1 90);
+  --chart-4: oklch(0.75 0.09 165);
+  --chart-5: oklch(0.72 0.09 250);
+  --pastel-mint: oklch(0.36 0.06 165);
+  --pastel-butter: oklch(0.42 0.07 95);
+  --pastel-sky: oklch(0.36 0.05 230);
+  --sidebar: oklch(0.24 0.03 230);
+  --sidebar-foreground: oklch(0.95 0.015 85);
+  --sidebar-primary: oklch(0.78 0.09 190);
+  --sidebar-primary-foreground: oklch(0.22 0.04 230);
+  --sidebar-accent: oklch(0.3 0.03 230);
+  --sidebar-accent-foreground: oklch(0.95 0.015 85);
+  --sidebar-border: oklch(0.36 0.035 230);
+  --sidebar-ring: oklch(0.65 0.09 190);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+  h1, h2, h3, [data-slot="card-title"], [data-slot="dialog-title"], [data-slot="alert-dialog-title"] {
+    font-family: var(--font-heading);
+    font-weight: 400;
+    font-synthesis: none;
+    letter-spacing: 0.01em;
+  }
+  ::selection {
+    background: var(--pastel-butter);
   }
 }
+/* ---------- Rendered course notes ---------- */
+@layer components {
+  .md-prose {
+    @apply text-[1.0625rem] leading-7 text-foreground;
+  }
+  .md-prose > * + * { @apply mt-4; }
+  .md-prose h1, .md-prose h2, .md-prose h3, .md-prose h4 {
+    @apply scroll-mt-20 font-semibold tracking-tight;
+  }
+  .md-prose h1 { @apply mt-10 border-b pb-2 text-2xl first:mt-0; }
+  .md-prose h2 { @apply mt-8 text-xl; }
+  .md-prose h3 { @apply mt-6 text-lg; }
+  .md-prose h4 { @apply mt-5 text-base; }
+  .md-prose :is(h1, h2, h3):target,
+  .md-prose .section-highlight {
+    @apply -mx-2 rounded-md px-2;
+    background: var(--pastel-butter);
+    transition: background-color 1.5s ease;
+  }
+  .md-prose a { @apply text-primary underline underline-offset-4; }
+  .md-prose ul { @apply list-disc pl-6; }
+  .md-prose ol { @apply list-decimal pl-6; }
+  .md-prose li + li { @apply mt-1; }
+  .md-prose blockquote { @apply border-l-4 pl-4 text-muted-foreground italic; }
+  .md-prose hr { @apply my-8; }
+  .md-prose table { @apply w-full border-collapse text-sm; }
+  .md-prose th, .md-prose td { @apply border px-3 py-1.5 text-left align-top; }
+  .md-prose th { @apply bg-muted font-medium; }
+  .md-prose :not(pre) > code,
+  .md-inline :not(pre) > code {
+    @apply rounded bg-muted px-1.5 py-0.5 font-mono text-[0.85em];
+  }
+  .md-prose pre, .md-inline pre {
+    @apply overflow-x-auto rounded-lg border bg-muted/50 p-4 font-mono text-[0.85rem] leading-6;
+  }
+  .md-prose .katex-display { @apply overflow-x-auto overflow-y-hidden py-1; }
 
-body {
-  background: var(--background);
+  .md-inline > p { @apply inline; }
+  .md-inline > * + * { @apply mt-2; }
+  .md-inline .katex-display { @apply my-2 overflow-x-auto; }
+}
+
+/* highlight.js tokens, themed with the app palette */
+.hljs-comment, .hljs-quote { color: oklch(0.55 0.02 260); font-style: italic; }
+.hljs-keyword, .hljs-selector-tag, .hljs-built_in { color: oklch(0.5 0.2 300); }
+.hljs-string, .hljs-attr, .hljs-template-string { color: oklch(0.5 0.14 150); }
+.hljs-number, .hljs-literal { color: oklch(0.55 0.16 50); }
+.hljs-title, .hljs-function .hljs-title, .hljs-title.function_ { color: oklch(0.5 0.17 250); }
+.hljs-type, .hljs-params { color: oklch(0.55 0.12 200); }
+.dark .hljs-keyword, .dark .hljs-selector-tag, .dark .hljs-built_in { color: oklch(0.75 0.15 300); }
+.dark .hljs-string, .dark .hljs-attr, .dark .hljs-template-string { color: oklch(0.78 0.13 150); }
+.dark .hljs-number, .dark .hljs-literal { color: oklch(0.8 0.13 60); }
+.dark .hljs-title, .dark .hljs-function .hljs-title, .dark .hljs-title.function_ { color: oklch(0.78 0.12 250); }
+.dark .hljs-type, .dark .hljs-params { color: oklch(0.78 0.1 200); }
+.dark .hljs-comment, .dark .hljs-quote { color: oklch(0.65 0.02 260); }
+
+/* Wordmark: the slab display font in flat ink. */
+.kouize-wordmark {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-synthesis: none;
+  letter-spacing: 0.02em;
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Flat "highlighter" mark for a key word in a title. */
+.kouize-highlight {
+  background: var(--pastel-butter);
+  border-radius: 0.3em;
+  padding: 0 0.15em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+/* Pages that need the whole screen (e.g. a subject) mark themselves with data-full-width. */
+body:has([data-full-width]) .page-container {
+  max-width: none;
 }

@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // An unpacked copy of the hosting zip.
+    "kouize-hosting/**",
   ]),
 ]);
 
