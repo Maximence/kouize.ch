@@ -5,8 +5,8 @@ const nextConfig: NextConfig = {
   partialPrefetching: true,
   experimental: {
     serverActions: {
-      // Markdown uploads go through a Server Action.
-      bodySizeLimit: "10mb",
+      // Markdown uploads, and quizzes with their notes (PDFs up to 15 MB each), go through Server Actions.
+      bodySizeLimit: "40mb",
     },
   },
   turbopack: {

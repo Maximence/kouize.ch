@@ -1,10 +1,12 @@
 import { eq } from "drizzle-orm";
-import { ChevronLeftIcon, PencilIcon } from "lucide-react";
+import { ChevronLeftIcon, FileTextIcon, PencilIcon } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import {
+  AdminDeleteNoteButton,
   ArchiveClassButton,
+  DeleteClassButton,
   ImportToClassButton,
   PlayerRowActions,
   QuizRowActions,
@@ -22,6 +24,7 @@ import { db } from "@/lib/db";
 import { classes } from "@/lib/db/schema";
 import { formatDate, plural } from "@/lib/format";
 import { leaderboard } from "@/lib/game/queries";
+import { classNotes, formatBytes } from "@/lib/notes";
 import { SUGGESTION_KINDS, classSuggestions } from "@/lib/suggestions";
 
 export const metadata = { title: "Classe · Admin" };
@@ -47,6 +50,7 @@ async function Content(props: Props) {
   const xpByPlayer = new Map(all.map((r) => [r.playerId, r.xp]));
   const ideas = classSuggestions(cls.id);
   const openIdeas = ideas.filter((s) => s.status === "open");
+  const notes = classNotes(cls.id);
 
   return (
     <div className="grid gap-8" data-full-width>
@@ -81,6 +85,7 @@ async function Content(props: Props) {
             }
           />
           <ArchiveClassButton classId={cls.id} archived={cls.archived} />
+          <DeleteClassButton classId={cls.id} name={cls.name} />
         </div>
       </div>
 
@@ -108,7 +113,7 @@ async function Content(props: Props) {
                   )}
                   <span className="block text-xs text-muted-foreground">
                     {q.subject ? `${q.subject.emoji} ${q.subject.name} · ` : ""}
-                    {plural(q.questionCount, "question")} · {plural(q.attemptCount, "tentative")} · mis à jour le {formatDate(q.updatedAt)}
+                    {plural(q.questionCount, "question")} · {plural(q.attemptCount, "tentative")} · {q.uploaderName ? `ajouté par ${q.uploaderName} · ` : ""}mis à jour le {formatDate(q.updatedAt)}
                   </span>
                 </span>
                 <QuizRowActions quiz={q} />
@@ -139,6 +144,30 @@ async function Content(props: Props) {
                   <p className="mt-1 whitespace-pre-wrap">“{s.message}”</p>
                 </div>
                 <SuggestionActions id={s.id} status={s.status} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="grid gap-3">
+        <h2 className="text-lg font-semibold">Notes · {notes.length}</h2>
+        {!notes.length ? (
+          <p className="text-sm text-muted-foreground">Aucun fichier de notes dans cette classe.</p>
+        ) : (
+          <ul className="divide-y rounded-lg border bg-card" data-testid="admin-notes">
+            {notes.map((n) => (
+              <li key={n.id} className="flex items-center gap-3 px-4 py-2 text-sm">
+                <FileTextIcon className="size-4 shrink-0 text-muted-foreground" />
+                <span className="min-w-0 flex-1">
+                  <Link href={`/k/${cls.code}/notes/${n.id}`} className="font-medium break-all hover:underline">
+                    {n.name}
+                  </Link>
+                  <span className="block text-xs text-muted-foreground">
+                    {n.quizTitle} · {formatBytes(n.bytes)} · {n.uploaderName ? `par ${n.uploaderName} · ` : ""}le {formatDate(n.createdAt)}
+                  </span>
+                </span>
+                <AdminDeleteNoteButton noteId={n.id} name={n.name} />
               </li>
             ))}
           </ul>

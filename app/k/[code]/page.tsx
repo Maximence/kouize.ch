@@ -1,4 +1,5 @@
-import { AwardIcon, ListChecksIcon, PlusIcon, SettingsIcon, TrophyIcon, UserIcon } from "lucide-react";
+import { AwardIcon, FileTextIcon, ListChecksIcon, PlusIcon, SettingsIcon, TrophyIcon, UserIcon } from "lucide-react";
+import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { connection } from "next/server";
@@ -12,6 +13,7 @@ import { LevelBar } from "@/components/level-bar";
 import { RenameMe } from "@/components/me-card";
 import {
   AddQuizDialog,
+  DeleteNoteButton,
   ClassSettingsForm,
   InviteForm,
   LeaveClassButton,
@@ -28,10 +30,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { currentPlayer } from "@/lib/auth/player";
 import { currentUser } from "@/lib/auth/session";
 import {
+  OTHER_SUBJECT,
   adminClassQuizzes,
   classByCode,
   classInviteList,
   classQuizzes,
+  classSubjects,
   groupBySubject,
   memberAccounts,
   membership,
@@ -40,6 +44,7 @@ import {
 import { classes } from "@/lib/db/schema";
 import { formatDate, plural } from "@/lib/format";
 import { leaderboard, playerBadgeList, playerStanding } from "@/lib/game/queries";
+import { classNotes, formatBytes, type ClassNote } from "@/lib/notes";
 import { aiPrompt } from "@/lib/quiz/upload";
 import { isHosted } from "@/lib/settings";
 import { SUGGESTION_KINDS, classSuggestions } from "@/lib/suggestions";
@@ -103,7 +108,7 @@ async function ClassContent(props: Props) {
   const quizzes = classQuizzes(cls.id, player.id);
   const standing = playerStanding(player.id, cls.id);
   const badges = playerBadgeList(player.id, cls.id);
-  const tabs = ["quizzes", ...(solo ? [] : ["leaderboard"]), "me", ...(isOwner ? ["manage"] : [])];
+  const tabs = ["quizzes", "notes", ...(solo ? [] : ["leaderboard"]), "me", ...(isOwner ? ["manage"] : [])];
 
   return (
     <div className="grid gap-6" data-full-width>
@@ -147,6 +152,9 @@ async function ClassContent(props: Props) {
               <TrophyIcon /> Classement
             </TabsTrigger>
           )}
+          <TabsTrigger value="notes">
+            <FileTextIcon /> Notes
+          </TabsTrigger>
           <TabsTrigger value="me">
             <UserIcon /> Moi
           </TabsTrigger>
@@ -162,6 +170,7 @@ async function ClassContent(props: Props) {
             <AddQuizDialog
               classId={cls.id}
               prompt={aiPrompt()}
+              subjects={classSubjects(cls.id)}
               trigger={
                 <Button variant="outline">
                   <PlusIcon /> Ajouter un quiz
@@ -185,6 +194,10 @@ async function ClassContent(props: Props) {
             </p>
           </TabsContent>
         )}
+
+        <TabsContent value="notes" className="pt-2">
+          <NotesList code={cls.code} classId={cls.id} playerId={player.id} isOwner={isOwner} />
+        </TabsContent>
 
         <TabsContent value="me" className="grid gap-6 pt-2">
           <Card>
@@ -214,6 +227,60 @@ async function ClassContent(props: Props) {
           </TabsContent>
         )}
       </Tabs>
+    </div>
+  );
+}
+
+/** The notes files of the class, by matière then quiz. Notes of hidden quizzes only for who may see them. */
+function NotesList({ code, classId, playerId, isOwner }: { code: string; classId: string; playerId: string; isOwner: boolean }) {
+  const canEdit = (n: ClassNote) => isOwner || n.uploadedBy === playerId || n.quizUploadedBy === playerId;
+  const notes = classNotes(classId).filter((n) => !n.quizHidden || canEdit(n));
+  if (!notes.length) {
+    return (
+      <p className="py-10 text-center text-muted-foreground">
+        Pas encore de notes. Joins-les quand tu ajoutes un quiz, ou avec le trombone à côté d&apos;un quiz que tu as ajouté.
+      </p>
+    );
+  }
+  const groups = new Map<string, { label: string; quizzes: Map<string, { title: string; notes: ClassNote[] }> }>();
+  for (const n of notes) {
+    const key = n.subject?.name ?? OTHER_SUBJECT.name;
+    const g = groups.get(key) ?? { label: n.subject ? `${n.subject.emoji} ${n.subject.name}` : `${OTHER_SUBJECT.emoji} ${OTHER_SUBJECT.name}`, quizzes: new Map() };
+    const q = g.quizzes.get(n.quizId) ?? { title: n.quizTitle, notes: [] };
+    q.notes.push(n);
+    g.quizzes.set(n.quizId, q);
+    groups.set(key, g);
+  }
+  return (
+    <div className="grid gap-6" data-testid="class-notes">
+      {[...groups.entries()]
+        .sort(([a], [b]) => a.localeCompare(b, "fr"))
+        .map(([key, g]) => (
+          <section key={key} className="grid gap-3">
+            <h2 className="text-lg font-semibold">{g.label}</h2>
+            {[...g.quizzes.entries()].map(([quizId, q]) => (
+              <div key={quizId} className="rounded-lg border bg-card">
+                <p className="border-b px-4 py-2 text-sm font-medium">{q.title}</p>
+                <ul className="divide-y">
+                  {q.notes.map((n) => (
+                    <li key={n.id} className="flex items-center gap-3 px-4 py-2" data-testid="class-note">
+                      <FileTextIcon className="size-4 shrink-0 text-muted-foreground" />
+                      <span className="min-w-0 flex-1">
+                        <Link href={`/k/${code}/notes/${n.id}`} className="font-medium break-all hover:underline">
+                          {n.name}
+                        </Link>
+                        <span className="block text-xs text-muted-foreground">
+                          {formatBytes(n.bytes)} · {n.uploaderName ? `par ${n.uploaderName} · ` : ""}le {formatDate(n.createdAt)}
+                        </span>
+                      </span>
+                      {canEdit(n) && <DeleteNoteButton classId={classId} noteId={n.id} name={n.name} />}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </section>
+        ))}
     </div>
   );
 }

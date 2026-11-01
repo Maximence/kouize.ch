@@ -310,13 +310,24 @@ test("students make their own classes, add quizzes from their AI and invite frie
   await carol.goto(classUrl);
   await carol.getByRole("button", { name: "Ajouter un quiz" }).filter({ visible: true }).click();
 
+  // No matière in the class yet: she creates one, and attaches the notes the quiz comes from.
+  await expect(carol.getByLabel("1. Matière").filter({ visible: true })).toHaveValue("__new__");
+  await carol.getByLabel("Nom de la nouvelle matière").filter({ visible: true }).fill("Biologie");
+  await carol.getByRole("radio", { name: "🧬" }).filter({ visible: true }).click();
+  await carol.getByTestId("upload-notes-input").setInputFiles({
+    name: "cellule.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# La cellule\n\nLe **noyau** contient l'ADN."),
+  });
+  await expect(carol.getByTestId("picked-notes").filter({ visible: true })).toContainText("cellule.md");
   await carol.getByLabel("Ou colle la réponse de l'IA").filter({ visible: true }).fill("{ broken");
   await carol.getByRole("button", { name: "Ajouter le quiz" }).filter({ visible: true }).click();
   await expect(carol.getByText(/pas du JSON valide/).filter({ visible: true })).toBeVisible();
   await carol.getByLabel("Ou colle la réponse de l'IA").filter({ visible: true }).fill(`Here you go!\n\`\`\`json\n${JSON.stringify(quiz)}\n\`\`\``);
   await carol.getByRole("button", { name: "Ajouter le quiz" }).filter({ visible: true }).click();
   await expect(carol.getByText("Quiz ajouté à la classe").filter({ visible: true })).toBeVisible();
-  await carol.keyboard.press("Escape");
+  await expect(carol.getByTestId("class-subject").filter({ visible: true })).toContainText("🧬");
+  await expect(carol.getByTestId("class-subject").filter({ visible: true })).toContainText("Biologie");
   await carol.goto(`${classUrl}?tab=manage`);
   await expect(carol.getByTestId("owner-quiz").filter({ visible: true })).toContainText("Cell biology");
 
@@ -348,7 +359,7 @@ test("students make their own classes, add quizzes from their AI and invite frie
   await dave.getByRole("button", { name: "Rejoindre la classe" }).filter({ visible: true }).click();
   await expect(dave.getByRole("heading", { name: /Bio study group/ }).filter({ visible: true })).toBeVisible();
   await expect(dave.getByRole("tab", { name: "Gérer" })).toHaveCount(0);
-  await openQuiz(dave, "Autres quiz");
+  await openQuiz(dave, "Biologie");
   await dave.getByRole("button", { name: "Entraînement", exact: true }).filter({ visible: true }).click();
   await playPractice(dave, "1");
   await expect(dave.getByTestId("xp-gained").filter({ visible: true })).toHaveText(/\+\d+ XP/);
@@ -356,11 +367,44 @@ test("students make their own classes, add quizzes from their AI and invite frie
   // Any member can add a quiz too, then hide or delete it.
   await dave.goto(classUrl);
   await dave.getByRole("button", { name: "Ajouter un quiz" }).filter({ visible: true }).click();
+  // The class's matières are offered first; Dave starts a new one.
+  await expect(dave.getByLabel("1. Matière").filter({ visible: true })).toHaveValue("Biologie");
+  await dave.getByLabel("1. Matière").filter({ visible: true }).selectOption("__new__");
+  await dave.getByLabel("Nom de la nouvelle matière").filter({ visible: true }).fill("Génétique");
   await dave.getByLabel("Ou colle la réponse de l'IA").filter({ visible: true }).fill(JSON.stringify({ ...quiz, quiz: { title: "Dave's genetics", language: "fr" } }));
+  // A file that only pretends to be a PDF is refused.
+  await dave.getByTestId("upload-notes-input").setInputFiles({ name: "faux.pdf", mimeType: "application/pdf", buffer: Buffer.from("<html>nope</html>") });
+  await dave.getByRole("button", { name: "Ajouter le quiz" }).filter({ visible: true }).click();
+  await expect(dave.getByText(/faux\.pdf : seuls les fichiers PDF, TXT et MD/).filter({ visible: true })).toBeVisible();
+  await dave.getByRole("button", { name: "Retirer faux.pdf" }).filter({ visible: true }).click();
+  await dave.getByTestId("upload-notes-input").setInputFiles({ name: "adn.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4\n%%EOF\n") });
   await dave.getByRole("button", { name: "Ajouter le quiz" }).filter({ visible: true }).click();
   await expect(dave.getByText("Quiz ajouté à la classe").filter({ visible: true })).toBeVisible();
-  await dave.keyboard.press("Escape");
+  await expect(dave.getByTestId("class-subject").filter({ visible: true })).toHaveCount(2);
   await expect(dave.getByTestId("my-upload").filter({ visible: true })).toContainText("Dave's genetics");
+
+  // ---- Notes tab: everyone's files, by matière then quiz, readable in the page
+  await dave.goto(`${classUrl}?tab=notes`);
+  const notes = dave.getByTestId("class-notes").filter({ visible: true });
+  await expect(notes).toContainText("🧬 Biologie");
+  await expect(notes).toContainText("cellule.md");
+  await expect(notes).toContainText("par Carol");
+  await expect(notes).toContainText("adn.pdf");
+  await dave.getByRole("link", { name: "cellule.md" }).filter({ visible: true }).click();
+  await expect(dave.getByTestId("note-title").filter({ visible: true })).toHaveText("cellule.md");
+  await expect(dave.getByTestId("note-content").filter({ visible: true }).locator("strong")).toHaveText("noyau");
+  const noteUrl = dave.url();
+  const noteFile = noteUrl.replace(/\/k\/[^/]+\/notes\//, "/api/notes/");
+  expect((await dave.request.get(noteFile)).status()).toBe(200);
+  // Not for people outside the class.
+  expect((await eve.request.get(noteFile)).status()).toBe(404);
+  await eve.goto(noteUrl);
+  await expect(eve.getByText("Page introuvable").filter({ visible: true })).toBeVisible();
+  // Dave can delete his own notes, not Carol's.
+  await dave.goto(`${classUrl}?tab=notes`);
+  await expect(dave.getByRole("button", { name: "Supprimer cellule.md" })).toHaveCount(0);
+  await expect(dave.getByRole("button", { name: "Supprimer adn.pdf" }).filter({ visible: true })).toBeVisible();
+  await dave.goto(classUrl);
   await carol.goto(`${classUrl}?tab=manage`);
   await expect(carol.getByTestId("owner-quiz").filter({ visible: true }).filter({ hasText: "Dave's genetics" })).toContainText("ajouté par Dave");
   await dave.getByRole("button", { name: "Supprimer Dave's genetics" }).filter({ visible: true }).click();
@@ -389,14 +433,15 @@ test("students make their own classes, add quizzes from their AI and invite frie
   await expect(carol.getByLabel("Adresses e-mail")).toHaveCount(0);
   await carol.goto(carol.url().replace("?tab=manage", ""));
   await carol.getByRole("button", { name: "Ajouter un quiz" }).filter({ visible: true }).click();
+  await carol.getByLabel("Nom de la nouvelle matière").filter({ visible: true }).fill("Chimie");
   await carol.getByTestId("upload-quiz-input").setInputFiles({
     name: "quiz.json",
     mimeType: "application/json",
     buffer: Buffer.from(JSON.stringify(quiz)),
   });
+  await carol.getByRole("button", { name: "Ajouter le quiz" }).filter({ visible: true }).click();
   await expect(carol.getByText("Quiz ajouté à la classe").filter({ visible: true })).toBeVisible();
-  await carol.keyboard.press("Escape");
-  await expect(carol.getByTestId("class-subject").filter({ visible: true })).toContainText("Autres quiz");
+  await expect(carol.getByTestId("class-subject").filter({ visible: true })).toContainText("Chimie");
   await carol.goto(`${HOSTED}/`);
   await expect(carol.getByTestId("class-card").filter({ visible: true })).toHaveCount(2);
 
@@ -404,4 +449,38 @@ test("students make their own classes, add quizzes from their AI and invite frie
   await dave.goto(`${classUrl}?tab=manage`);
   await expect(dave.getByLabel("Adresses e-mail")).toHaveCount(0);
   await expect(dave.getByTestId("owner-quiz")).toHaveCount(0);
+
+  // ---- The admin sees and manages every class, students' included
+  const admin = await (await browser.newContext()).newPage();
+  await admin.goto(`${HOSTED}/admin/login`);
+  await admin.getByLabel("Mot de passe admin").filter({ visible: true }).fill("admin-e2e");
+  await admin.getByRole("button", { name: "Se connecter" }).filter({ visible: true }).click();
+  await admin.getByTestId("admin-class").filter({ visible: true }).filter({ hasText: "Bio study group" }).click();
+  await expect(admin.getByTestId("admin-notes").filter({ visible: true })).toContainText("cellule.md");
+  await admin.getByTestId("admin-quiz").filter({ visible: true }).filter({ hasText: "Cell biology" }).getByRole("button", { name: "Supprimer le quiz" }).click();
+  await admin.getByRole("button", { name: "Supprimer", exact: true }).filter({ visible: true }).click();
+  await expect(admin.getByTestId("admin-quiz")).toHaveCount(0);
+  await expect(admin.getByTestId("admin-notes")).toHaveCount(0);
+  await admin.goto(`${HOSTED}/admin`);
+  await admin.getByTestId("admin-class").filter({ visible: true }).filter({ hasText: "My revision" }).click();
+  await admin.getByRole("button", { name: "Supprimer", exact: true }).filter({ visible: true }).click();
+  await admin.getByRole("alertdialog").getByRole("button", { name: "Supprimer", exact: true }).click();
+  await expect(admin).toHaveURL(/\/admin$/);
+  await expect(admin.getByTestId("admin-class").filter({ hasText: "My revision" })).toHaveCount(0);
+  await carol.goto(`${HOSTED}/`);
+  await expect(carol.getByTestId("class-card").filter({ visible: true })).toHaveCount(1);
+
+  // ---- The admin changes their password: the old one stops working
+  await admin.getByLabel("Mot de passe actuel").filter({ visible: true }).fill("admin-e2e");
+  await admin.getByLabel("Nouveau mot de passe").filter({ visible: true }).fill("a-much-longer-secret");
+  await admin.getByRole("button", { name: "Changer le mot de passe" }).filter({ visible: true }).click();
+  await expect(admin.getByText("Mot de passe admin changé").filter({ visible: true })).toBeVisible();
+  await admin.getByRole("button", { name: "Se déconnecter" }).filter({ visible: true }).click();
+  await admin.goto(`${HOSTED}/admin/login`);
+  await admin.getByLabel("Mot de passe admin").filter({ visible: true }).fill("admin-e2e");
+  await admin.getByRole("button", { name: "Se connecter" }).filter({ visible: true }).click();
+  await expect(admin.getByText("Mot de passe incorrect.").filter({ visible: true })).toBeVisible();
+  await admin.getByLabel("Mot de passe admin").filter({ visible: true }).fill("a-much-longer-secret");
+  await admin.getByRole("button", { name: "Se connecter" }).filter({ visible: true }).click();
+  await expect(admin).toHaveURL(/\/admin$/);
 });

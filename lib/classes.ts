@@ -239,6 +239,14 @@ export function checkPublishToken(header: string | null): boolean {
   return Boolean(stored && token && safeEqual(hashToken(token), stored));
 }
 
+/** The matières already used in a class (from its quizzes), in alphabetical order. */
+export function classSubjects(classId: string) {
+  const rows = db.select({ subject: quizzes.subject }).from(quizzes).where(eq(quizzes.classId, classId)).all();
+  const byKey = new Map<string, NonNullable<(typeof rows)[number]["subject"]>>();
+  for (const r of rows) if (r.subject && !byKey.has(normalizeAnswer(r.subject.name))) byKey.set(normalizeAnswer(r.subject.name), r.subject);
+  return [...byKey.values()].sort((a, b) => a.name.localeCompare(b.name, "fr"));
+}
+
 /** Quizzes without a subject (e.g. imported from a file) go in this group. */
 export const OTHER_SUBJECT = { key: "autres", name: "Autres quiz", emoji: "📂", color: "#e3cfa6" };
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { isEmail, normalizeEmail, safeNext } from "@/lib/auth/email";
+import { sniffNote } from "@/lib/note-files";
 import { aiPrompt, parseUpload } from "@/lib/quiz/upload";
 
 const question = {
@@ -89,5 +90,21 @@ describe("account helpers", () => {
     expect(safeNext("/\\evil.example")).toBe("/");
     expect(safeNext("https://evil.example")).toBe("/");
     expect(safeNext(undefined, "/join")).toBe("/join");
+  });
+});
+
+describe("notes files", () => {
+  const text = (s: string) => Buffer.from(s, "utf8");
+  it("accepts real PDFs, text and Markdown", () => {
+    expect(sniffNote(Buffer.from("%PDF-1.7\n…"), "cours.pdf")).toBe("application/pdf");
+    expect(sniffNote(text("Résumé du cours"), "notes.TXT")).toBe("text/plain");
+    expect(sniffNote(text("# Titre\n\nTexte"), "notes.md")).toBe("text/markdown");
+  });
+
+  it("refuses renamed or binary files", () => {
+    expect(sniffNote(text("<html>"), "fake.pdf")).toBeNull();
+    expect(sniffNote(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0]), "image.md")).toBeNull();
+    expect(sniffNote(Buffer.from([0xff, 0xfe, 0xfd]), "latin.txt")).toBeNull();
+    expect(sniffNote(text("hello"), "notes.docx")).toBeNull();
   });
 });

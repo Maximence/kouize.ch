@@ -6,8 +6,16 @@ import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { importToClass, removePlayer, renamePlayer, setClassArchived, setQuizHidden } from "@/lib/actions/admin";
-import { deleteQuiz } from "@/lib/actions/quizzes";
+import {
+  adminDeleteClass,
+  adminDeleteNote,
+  adminDeleteQuiz,
+  importToClass,
+  removePlayer,
+  renamePlayer,
+  setClassArchived,
+  setQuizHidden,
+} from "@/lib/actions/admin";
 import type { ActionResult } from "@/lib/actions/result";
 import { updateSuggestion } from "@/lib/actions/suggestions";
 
@@ -31,6 +39,38 @@ export function ArchiveClassButton({ classId, archived }: { classId: string; arc
   );
 }
 
+export function DeleteClassButton({ classId, name }: { classId: string; name: string }) {
+  const [, run] = useAction();
+  return (
+    <ConfirmDialog
+      title={`Supprimer la classe « ${name} » ?`}
+      description="Ses quiz, les résultats de tous les joueurs, le classement, les invitations et les notes sont supprimés définitivement. Archiver la classe garde tout."
+      onConfirm={() => run(() => adminDeleteClass(classId))}
+      trigger={
+        <Button variant="outline" className="text-destructive">
+          <Trash2Icon /> Supprimer
+        </Button>
+      }
+    />
+  );
+}
+
+export function AdminDeleteNoteButton({ noteId, name }: { noteId: string; name: string }) {
+  const [, run] = useAction();
+  return (
+    <ConfirmDialog
+      title={`Supprimer « ${name} » ?`}
+      description="Le fichier de notes est supprimé pour toute la classe. Le quiz reste."
+      onConfirm={() => run(() => adminDeleteNote(noteId), "Fichier supprimé")}
+      trigger={
+        <Button variant="ghost" size="sm" aria-label={`Supprimer ${name}`}>
+          <Trash2Icon />
+        </Button>
+      }
+    />
+  );
+}
+
 export function QuizRowActions({ quiz }: { quiz: { id: string; title: string; hidden: boolean } }) {
   const [pending, run] = useAction();
   return (
@@ -47,7 +87,7 @@ export function QuizRowActions({ quiz }: { quiz: { id: string; title: string; hi
       <ConfirmDialog
         title={`Supprimer « ${quiz.title} » ?`}
         description="Le quiz est supprimé avec toutes ses tentatives, ce qui retire aussi ses points du classement. Le masquer garde les points."
-        onConfirm={() => run(() => deleteQuiz(quiz.id), "Quiz supprimé")}
+        onConfirm={() => run(() => adminDeleteQuiz(quiz.id), "Quiz supprimé")}
         trigger={
           <Button variant="ghost" size="sm" aria-label="Supprimer le quiz">
             <Trash2Icon />

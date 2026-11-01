@@ -64,6 +64,13 @@
       "when": 1793543568620,
       "tag": "0008_member_uploads",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1793551112673,
+      "tag": "0009_quiz_notes",
+      "breakpoints": true
     }
   ]
 }

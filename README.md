@@ -8,7 +8,8 @@ KOUIZE transforme tes notes de cours en quiz pour réviser, seul ou avec ta clas
 - **Créer tes propres classes** :
   - **privée** : tu invites tes amis par e-mail, et eux seuls la voient ;
   - **personnelle** : rien que pour toi, pour t'entraîner et suivre tes progrès.
-- **Ajouter des quiz faits avec ton IA** (ChatGPT, Claude, Gemini…) à partir de tes propres notes. Chaque membre d'une classe peut en ajouter.
+- **Ajouter des quiz faits avec ton IA** (ChatGPT, Claude, Gemini…) à partir de tes propres notes, rangés par matière. Chaque membre d'une classe peut en ajouter.
+- **Partager tes notes** : joins à chaque quiz les notes d'où il vient (PDF, TXT ou MD). Toute la classe peut les lire dans l'onglet **Notes**.
 - **Suivre ta progression** : score, temps et correction détaillée à chaque tentative, XP, niveaux, badges, classement de la semaine et depuis le début.
 
 ## Commencer
@@ -23,13 +24,23 @@ Tu retrouves tout en te connectant, sur n'importe quel appareil.
 
 ## Ajouter un quiz avec ton IA
 
-1. Dans une classe, clique sur **Ajouter un quiz**, puis sur **Copier le prompt pour ton IA**.
-2. Colle ce prompt dans ton IA, suivi de tes notes (texte, PDF, diapositives : tout ce que ton IA sait lire).
-3. Copie sa réponse, colle-la dans KOUIZE et clique sur **Ajouter le quiz**. Tu peux aussi l'enregistrer dans un fichier `.json` et l'envoyer.
+1. Dans une classe, clique sur **Ajouter un quiz**.
+2. Choisis la **matière** du quiz parmi celles de la classe, ou crée-en une nouvelle (un nom et un emoji).
+3. Clique sur **Copier le prompt pour ton IA**, colle-le dans ton IA, suivi de tes notes (texte, PDF, diapositives : tout ce que ton IA sait lire).
+4. Copie sa réponse et colle-la dans KOUIZE. Tu peux aussi l'enregistrer dans un fichier `.json` et l'envoyer.
+5. Si tu veux, joins tes notes (PDF, TXT ou MD, jusqu'à 5 fichiers de 15 Mo), puis clique sur **Ajouter le quiz**.
 
 Si quelque chose ne va pas, KOUIZE t'indique quelle question corriger : demande simplement à ton IA de la refaire.
 
 Les quiz peuvent mélanger cinq types de questions : choix multiple, plusieurs réponses, vrai/faux, réponse courte et texte à trous.
+
+## Lire les notes
+
+L'onglet **Notes** d'une classe rassemble les notes de tous les membres, rangées par matière puis par quiz, avec qui les a ajoutées. Clique sur un fichier pour le lire dans la page : les fichiers Markdown sont mis en forme, les PDF s'ouvrent dans la visionneuse du navigateur, et tu peux tout télécharger.
+
+Pour ajouter des notes plus tard à un quiz que tu as ajouté, clique sur le trombone à côté de ce quiz. Tu peux supprimer les notes que tu as ajoutées ; la personne qui gère la classe peut supprimer toutes les notes.
+
+Les notes ne sont visibles que par les membres de la classe.
 
 ## Jouer
 
@@ -54,11 +65,13 @@ Dans l'onglet **Gérer** de ta classe, tu peux :
 - traiter les suggestions de correction ;
 - renommer la classe, la passer de privée à personnelle (ou l'inverse), ou la supprimer.
 
-Chaque membre peut masquer ou supprimer les quiz qu'il a lui-même ajoutés.
+Chaque membre peut masquer ou supprimer les quiz qu'il a lui-même ajoutés, et leurs notes.
 
 ## Pour les enseignants
 
 Les enseignants préparent leurs quiz dans le **studio** KOUIZE sur leur ordinateur : ils déposent leurs notes, l'IA écrit des questions tirées uniquement de ces notes, puis ils les publient dans leurs classes en ligne. Les élèves rejoignent ces classes avec un code et un mot de passe.
+
+Depuis la page **Admin**, l'enseignant voit et gère toutes les classes, y compris celles créées par les élèves : il peut masquer ou supprimer n'importe quel quiz ou fichier de notes, retirer des joueurs, archiver ou supprimer une classe, et changer son mot de passe admin.
 
 ## Installer et héberger
 

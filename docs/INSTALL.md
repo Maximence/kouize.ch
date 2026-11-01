@@ -130,6 +130,16 @@ KOUIZE_PUBLIC_URL=https://your-domain.ch
 - `.env.production` goes into the zip, so run `npm run package:hosting` again after changing it.
 - When an email can't be sent, the server log says `Email not sent:` with the reason, and whoever invited gets the link to send themselves.
 
+### Admin password
+
+`KOUIZE_ADMIN_PASSWORD` is the first admin password. Once you change it from **Admin → Mot de passe admin**, the new one is stored (hashed) in the database and replaces the environment's; other admin sessions are logged out.
+
+Forgot it? Set `KOUIZE_ADMIN_RESET=1` on the host and restart: the stored password is ignored and `KOUIZE_ADMIN_PASSWORD` works again. Log in, set a new password, then remove `KOUIZE_ADMIN_RESET` and restart.
+
+### Notes files
+
+Members can attach the notes a quiz was made from (PDF, TXT, MD; up to 5 files of 15 MB per upload). They're stored in the database (`quiz_notes`, bytes in `assets`) and served only to members of the class and the admin, through `/api/notes/[id]`. Text and Markdown are always sent as plain text. Deleting a quiz, a class or a note also deletes files nothing uses anymore. Plan disk space accordingly: `data/mdquiz.db` grows with the PDFs.
+
 ### Updating and backups
 
 To update the online copy, run `npm run package:hosting` again, unpack the zip and upload its contents (with hidden files such as `.env.production` and `.next`) over the site folder, replacing files. Then rebuild and restart. Leftover files from older versions are harmless now that the server doesn't build. The `data/` folder on the server holds everything, so don't delete it. Download `data/mdquiz.db` by SFTP from time to time (stop the site first for a clean copy).

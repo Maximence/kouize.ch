@@ -16,14 +16,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createCategory, updateCategory } from "@/lib/actions/categories";
+import { CATEGORY_COLORS, SUBJECT_EMOJIS } from "@/lib/subject-style";
 import { cn } from "@/lib/utils";
 
-// Pastel subject colors (teal, coral, butter, mint, sky, peach, sage, rose, sand, lilac).
-export const CATEGORY_COLORS = [
-  "#8fd3cc", "#f4a78f", "#f6d77a", "#a8e0c0", "#9ccbea",
-  "#fbc49a", "#bcd59c", "#f2a9bb", "#e3cfa6", "#c9b8ec",
-];
-const EMOJIS = ["📘", "🧮", "🎧", "💻", "🧪", "🧬", "📐", "🌍", "⚖️", "🎨", "📊", "🧠"];
+const EMOJIS = SUBJECT_EMOJIS;
 
 type Props = {
   trigger: React.ReactNode;

@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { adminLogin, createClass, newPublishToken, updateClass } from "@/lib/actions/admin";
+import { adminLogin, changeAdminPassword, createClass, newPublishToken, updateClass } from "@/lib/actions/admin";
 import type { FormState } from "@/lib/actions/classes";
 
 export function AdminLoginForm() {
@@ -157,5 +157,39 @@ export function PublishTokenButton({ exists }: { exists: boolean }) {
     >
       <KeyRoundIcon /> {exists ? "Remplacer le jeton de publication" : "Créer un jeton de publication"}
     </Button>
+  );
+}
+
+export function AdminPasswordForm() {
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [pending, startTransition] = useTransition();
+  return (
+    <form
+      className="grid gap-3 sm:max-w-sm"
+      onSubmit={(e) => {
+        e.preventDefault();
+        startTransition(async () => {
+          const res = await changeAdminPassword(current, next);
+          if (!res.ok) return void toast.error(res.error);
+          toast.success("Mot de passe admin changé");
+          setCurrent("");
+          setNext("");
+        });
+      }}
+    >
+      <div className="grid gap-1.5">
+        <Label htmlFor="admin-current">Mot de passe actuel</Label>
+        <Input id="admin-current" type="password" value={current} onChange={(e) => setCurrent(e.target.value)} required autoComplete="current-password" />
+      </div>
+      <div className="grid gap-1.5">
+        <Label htmlFor="admin-new">Nouveau mot de passe</Label>
+        <Input id="admin-new" type="password" value={next} onChange={(e) => setNext(e.target.value)} required minLength={10} autoComplete="new-password" />
+        <p className="text-xs text-muted-foreground">Au moins 10 caractères.</p>
+      </div>
+      <Button type="submit" variant="outline" className="w-fit" disabled={pending}>
+        Changer le mot de passe
+      </Button>
+    </form>
   );
 }

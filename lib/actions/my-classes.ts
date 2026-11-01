@@ -9,12 +9,15 @@ import { isEmail, normalizeEmail } from "@/lib/auth/email";
 import { currentPlayer } from "@/lib/auth/player";
 import { rateLimiter } from "@/lib/auth/rate-limit";
 import { currentUser, hashToken, type User } from "@/lib/auth/session";
-import { cleanDisplayName, freeDisplayName, membership, newClassCode, ownedClass, removeMember } from "@/lib/classes";
+import { classSubjects, cleanDisplayName, freeDisplayName, membership, newClassCode, ownedClass, removeMember } from "@/lib/classes";
 import { db } from "@/lib/db";
-import { categories, classInvites, classMembers, classes, players, quizzes, users } from "@/lib/db/schema";
+import { categories, classInvites, classMembers, classes, players, quizNotes, quizzes, users, type QuizSubject } from "@/lib/db/schema";
 import { sendMail, siteOrigin } from "@/lib/mail";
 import { receiveQuiz } from "@/lib/publish/receive";
+import { pruneNoteAssets, readNoteFiles, saveNotes } from "@/lib/notes";
+import { normalizeAnswer } from "@/lib/quiz/scoring";
 import { parseUpload } from "@/lib/quiz/upload";
+import { CATEGORY_COLORS, SUBJECT_EMOJIS } from "@/lib/subject-style";
 import { isHosted } from "@/lib/settings";
 import { fail, ok, type ActionResult } from "./result";
 
@@ -97,23 +100,76 @@ export async function deleteMyClass(classId: string): Promise<ActionResult> {
     tx.delete(classes).where(eq(classes.id, classId)).run();
     tx.delete(categories).where(eq(categories.id, owned.cls.categoryId)).run();
   });
+  pruneNoteAssets();
   redirect("/");
 }
 
+/** The matière picked for a new quiz: one already in the class (same spelling), or a new one. */
+function resolveSubject(classId: string, rawName: string, rawEmoji: string): QuizSubject | string {
+  const name = rawName.replace(/[\p{Cc}\p{Cf}]/gu, "").replace(/\s+/g, " ").trim();
+  if (!name) return "Choisis une matière, ou crées-en une.";
+  if (name.length > 60) return "Le nom de la matière doit faire moins de 60 caractères.";
+  const existing = classSubjects(classId);
+  const same = existing.find((s) => normalizeAnswer(s.name) === normalizeAnswer(name));
+  if (same) return same;
+  return {
+    name,
+    emoji: SUBJECT_EMOJIS.includes(rawEmoji) ? rawEmoji : SUBJECT_EMOJIS[0],
+    color: CATEGORY_COLORS[existing.length % CATEGORY_COLORS.length],
+  };
+}
+
 /**
- * Any member adds a quiz from a JSON file or pasted text (made with their own
- * AI, or a studio export). They can hide or delete it afterwards; so can the owner.
+ * Any member adds a quiz (a JSON file or pasted text, made with their own AI or
+ * exported from a studio) to a matière of the class, with the notes it was made
+ * from (PDF, TXT, MD). They can hide or delete it afterwards; so can the owner.
  */
-export async function uploadQuiz(classId: string, text: string): Promise<ActionResult<{ quizId: string }>> {
+export async function uploadQuiz(classId: string, form: FormData): Promise<ActionResult<{ quizId: string }>> {
   const player = await currentPlayer();
   const cls = db.select().from(classes).where(eq(classes.id, classId)).get();
   if (!player || !cls || cls.archived || !membership(player.id, cls.id)) return fail("Classe introuvable");
   if (!uploadLimit.take(player.id)) return fail("Ça fait beaucoup d'ajouts. Réessaie dans une heure.");
-  const parsed = parseUpload(text);
+  const subject = resolveSubject(cls.id, String(form.get("subject") ?? ""), String(form.get("emoji") ?? ""));
+  if (typeof subject === "string") return fail(subject);
+  const parsed = parseUpload(String(form.get("quiz") ?? ""));
   if (!parsed.ok) return fail(parsed.error);
-  const { quizId } = receiveQuiz(cls, null, parsed.data, undefined, player.id);
+  const notes = await readNoteFiles(form.getAll("notes").filter((f): f is File => f instanceof File));
+  if (!notes.ok) return fail(notes.error);
+  const { quizId } = receiveQuiz(cls, null, parsed.data, subject, player.id);
+  saveNotes(quizId, notes.files, player.id);
   refresh();
   return ok({ quizId });
+}
+
+/** Add notes to a quiz afterwards (its uploader or the class owner). */
+export async function addNotes(classId: string, quizId: string, form: FormData): Promise<ActionResult> {
+  const quiz = await editableQuiz(classId, quizId);
+  const player = await currentPlayer();
+  if (!quiz || !player) return fail("Quiz introuvable");
+  if (!uploadLimit.take(player.id)) return fail("Ça fait beaucoup d'ajouts. Réessaie dans une heure.");
+  const notes = await readNoteFiles(form.getAll("notes").filter((f): f is File => f instanceof File));
+  if (!notes.ok) return fail(notes.error);
+  if (!notes.files.length) return fail("Choisis au moins un fichier.");
+  saveNotes(quizId, notes.files, player.id);
+  refresh();
+  return ok();
+}
+
+/** Delete a notes file: whoever uploaded it, the uploader of its quiz, or the class owner. */
+export async function deleteNote(classId: string, noteId: string): Promise<ActionResult> {
+  const player = await currentPlayer();
+  const note = db
+    .select({ id: quizNotes.id, quizId: quizNotes.quizId, uploadedBy: quizNotes.uploadedBy })
+    .from(quizNotes)
+    .innerJoin(quizzes, eq(quizzes.id, quizNotes.quizId))
+    .where(and(eq(quizNotes.id, noteId), eq(quizzes.classId, classId)))
+    .get();
+  if (!player || !note || !membership(player.id, classId)) return fail("Fichier introuvable");
+  if (note.uploadedBy !== player.id && !(await editableQuiz(classId, note.quizId))) return fail("Fichier introuvable");
+  db.delete(quizNotes).where(eq(quizNotes.id, noteId)).run();
+  pruneNoteAssets();
+  refresh();
+  return ok();
 }
 
 /** A quiz of the class that the logged-in student may hide or delete: they own the class, or uploaded it. */
@@ -140,6 +196,7 @@ export async function setMyQuizHidden(classId: string, quizId: string, hidden: b
 export async function deleteMyQuiz(classId: string, quizId: string): Promise<ActionResult> {
   if (!(await editableQuiz(classId, quizId))) return fail("Quiz introuvable");
   db.delete(quizzes).where(eq(quizzes.id, quizId)).run();
+  pruneNoteAssets();
   refresh();
   return ok();
 }

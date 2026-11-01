@@ -1,6 +1,22 @@
 "use client";
 
-import { CheckIcon, CopyIcon, EyeIcon, EyeOffIcon, LockIcon, LogOutIcon, MailIcon, Trash2Icon, UploadIcon, UserIcon } from "lucide-react";
+import {
+  CheckIcon,
+  CopyIcon,
+  EyeIcon,
+  EyeOffIcon,
+  FileJsonIcon,
+  FileTextIcon,
+  Loader2Icon,
+  LockIcon,
+  LogOutIcon,
+  MailIcon,
+  PaperclipIcon,
+  Trash2Icon,
+  UploadIcon,
+  UserIcon,
+  XIcon,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -22,10 +38,12 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   acceptInviteById,
   acceptInviteToken,
+  addNotes,
   createMyClass,
   declineInvite,
   deleteMyClass,
   deleteMyQuiz,
+  deleteNote,
   inviteToClass,
   leaveClass,
   removeMyMember,
@@ -36,6 +54,7 @@ import {
   type InviteOutcome,
 } from "@/lib/actions/my-classes";
 import type { ActionResult } from "@/lib/actions/result";
+import { SUBJECT_EMOJIS } from "@/lib/subject-style";
 
 type Kind = "private" | "personal";
 
@@ -178,73 +197,228 @@ function CopyButton({ text, label = "Copier" }: { text: string; label?: string }
   );
 }
 
-/** Upload a JSON file or paste what the AI answered, with the prompt that makes it produce the right format. */
-export function UploadQuiz({ classId, prompt }: { classId: string; prompt: string }) {
-  const input = useRef<HTMLInputElement>(null);
+type Subject = { name: string; emoji: string; color: string };
+
+const NEW_SUBJECT = "__new__";
+const selectClass =
+  "h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
+
+/**
+ * Add a quiz: the matière it belongs to (an existing one or a new one), the quiz
+ * itself (pasted from the AI or a .json file), and the notes it was made from.
+ */
+export function UploadQuiz({ classId, prompt, subjects, onDone }: { classId: string; prompt: string; subjects: Subject[]; onDone?: () => void }) {
+  const quizInput = useRef<HTMLInputElement>(null);
+  const notesInput = useRef<HTMLInputElement>(null);
+  const [subject, setSubject] = useState(subjects.length ? subjects[0].name : NEW_SUBJECT);
+  const [newName, setNewName] = useState("");
+  const [emoji, setEmoji] = useState(SUBJECT_EMOJIS[0]);
   const [text, setText] = useState("");
+  const [quizFile, setQuizFile] = useState<string | null>(null);
+  const [notes, setNotes] = useState<File[]>([]);
   const [pending, startTransition] = useTransition();
-  const send = (body: string) =>
+  const creating = subject === NEW_SUBJECT;
+
+  const submit = () =>
     startTransition(async () => {
-      const res = await uploadQuiz(classId, body);
+      const form = new FormData();
+      form.set("subject", creating ? newName : subject);
+      form.set("emoji", emoji);
+      form.set("quiz", text);
+      for (const f of notes) form.append("notes", f);
+      const res = await uploadQuiz(classId, form);
       if (!res.ok) return void toast.error(res.error, { duration: 10_000 });
       toast.success("Quiz ajouté à la classe");
       setText("");
+      setQuizFile(null);
+      setNotes([]);
+      onDone?.();
     });
+
   return (
-    <div className="grid gap-4">
-      <ol className="grid list-decimal gap-1 pl-5 text-sm text-muted-foreground">
-        <li>Copie le prompt et colle-le dans ton IA (ChatGPT, Claude, Gemini…), suivi de tes notes.</li>
-        <li>Colle sa réponse ci-dessous, ou enregistre-la dans un fichier <code>.json</code> et envoie-le.</li>
-      </ol>
-      <div className="flex flex-wrap gap-2">
-        <CopyButton text={prompt} label="Copier le prompt pour ton IA" />
-        <Button type="button" variant="outline" size="sm" onClick={() => input.current?.click()} disabled={pending}>
-          <UploadIcon /> Envoyer un fichier de quiz
-        </Button>
-        <input
-          ref={input}
-          type="file"
-          accept=".json,application/json,.txt,text/plain"
-          hidden
-          data-testid="upload-quiz-input"
-          onChange={async (e) => {
-            const file = e.target.files?.[0];
-            e.target.value = "";
-            if (file) send(await file.text());
-          }}
-        />
-      </div>
-      <div className="grid gap-1.5">
-        <Label htmlFor="paste-quiz">Ou colle la réponse de l&apos;IA</Label>
-        <Textarea
-          id="paste-quiz"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder='{ "format": "mdquiz-quiz", "version": 1, "quiz": { … }, "questions": [ … ] }'
-          className="min-h-32 font-mono text-xs"
-        />
-      </div>
-      <Button type="button" className="w-fit" disabled={pending || !text.trim()} onClick={() => send(text)}>
-        Ajouter le quiz
+    <div className="grid gap-5">
+      <section className="grid gap-2">
+        <Label htmlFor="quiz-subject">1. Matière</Label>
+        <select id="quiz-subject" className={selectClass} value={subject} onChange={(e) => setSubject(e.target.value)}>
+          {subjects.map((s) => (
+            <option key={s.name} value={s.name}>
+              {s.emoji} {s.name}
+            </option>
+          ))}
+          <option value={NEW_SUBJECT}>➕ Nouvelle matière…</option>
+        </select>
+        {creating && (
+          <div className="grid gap-2 rounded-md border p-3">
+            <Label htmlFor="new-subject-name">Nom de la nouvelle matière</Label>
+            <Input id="new-subject-name" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="par ex. Biologie" maxLength={60} />
+            <div className="flex flex-wrap gap-1" role="radiogroup" aria-label="Emoji de la matière">
+              {SUBJECT_EMOJIS.map((e) => (
+                <button
+                  key={e}
+                  type="button"
+                  role="radio"
+                  aria-checked={emoji === e}
+                  onClick={() => setEmoji(e)}
+                  className={`grid size-8 place-items-center rounded-md border text-lg ${emoji === e ? "border-primary ring-1 ring-primary" : ""}`}
+                >
+                  {e}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </section>
+
+      <section className="grid gap-2">
+        <Label htmlFor="paste-quiz">2. Le quiz</Label>
+        <ol className="grid list-decimal gap-1 pl-5 text-sm text-muted-foreground">
+          <li>Copie le prompt et colle-le dans ton IA (ChatGPT, Claude, Gemini…), suivi de tes notes.</li>
+          <li>Colle sa réponse ci-dessous, ou envoie-la dans un fichier <code>.json</code>.</li>
+        </ol>
+        <div className="flex flex-wrap gap-2">
+          <CopyButton text={prompt} label="Copier le prompt pour ton IA" />
+          <Button type="button" variant="outline" size="sm" onClick={() => quizInput.current?.click()} disabled={pending}>
+            <UploadIcon /> Envoyer un fichier de quiz
+          </Button>
+          <input
+            ref={quizInput}
+            type="file"
+            accept=".json,application/json,.txt,text/plain"
+            hidden
+            data-testid="upload-quiz-input"
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (!file) return;
+              setText(await file.text());
+              setQuizFile(file.name);
+            }}
+          />
+        </div>
+        {quizFile ? (
+          <p className="flex items-center gap-2 text-sm">
+            <FileJsonIcon className="size-4" /> {quizFile}
+            <Button type="button" variant="ghost" size="sm" onClick={() => (setQuizFile(null), setText(""))}>
+              Retirer
+            </Button>
+          </p>
+        ) : (
+          <Textarea
+            id="paste-quiz"
+            aria-label="Ou colle la réponse de l'IA"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder='Colle ici la réponse de ton IA : { "format": "mdquiz-quiz", … }'
+            className="min-h-28 font-mono text-xs"
+          />
+        )}
+      </section>
+
+      <section className="grid gap-2">
+        <Label>3. Tes notes (facultatif)</Label>
+        <p className="text-sm text-muted-foreground">
+          Les notes d&apos;où vient le quiz (PDF, TXT ou MD, 15 Mo max chacun). Toute la classe pourra les lire dans
+          l&apos;onglet Notes.
+        </p>
+        <div>
+          <Button type="button" variant="outline" size="sm" onClick={() => notesInput.current?.click()} disabled={pending}>
+            <PaperclipIcon /> Joindre des notes
+          </Button>
+          <input
+            ref={notesInput}
+            type="file"
+            multiple
+            accept=".pdf,.txt,.md,.markdown,application/pdf,text/plain,text/markdown"
+            hidden
+            data-testid="upload-notes-input"
+            onChange={(e) => {
+              const picked = [...(e.target.files ?? [])];
+              e.target.value = "";
+              setNotes((n) => [...n, ...picked].slice(0, 5));
+            }}
+          />
+        </div>
+        {notes.length > 0 && (
+          <ul className="grid gap-1 text-sm" data-testid="picked-notes">
+            {notes.map((f, i) => (
+              <li key={`${f.name}-${i}`} className="flex items-center gap-2">
+                <FileTextIcon className="size-4 shrink-0" />
+                <span className="min-w-0 flex-1 truncate">{f.name}</span>
+                <Button type="button" variant="ghost" size="sm" aria-label={`Retirer ${f.name}`} onClick={() => setNotes((n) => n.filter((_, k) => k !== i))}>
+                  <XIcon />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <Button type="button" className="w-fit" disabled={pending || !text.trim() || (creating && !newName.trim())} onClick={submit}>
+        {pending && <Loader2Icon className="animate-spin" />} Ajouter le quiz
       </Button>
     </div>
   );
 }
 
-export function AddQuizDialog({ classId, prompt, trigger }: { classId: string; prompt: string; trigger: React.ReactNode }) {
+export function AddQuizDialog({ classId, prompt, subjects, trigger }: { classId: string; prompt: string; subjects: Subject[]; trigger: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
   return (
-    <Dialog>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Ajouter un quiz</DialogTitle>
           <DialogDescription>
             Génère-le avec ta propre IA, ou envoie un fichier exporté depuis KOUIZE. Toute la classe pourra y jouer.
           </DialogDescription>
         </DialogHeader>
-        <UploadQuiz classId={classId} prompt={prompt} />
+        <UploadQuiz classId={classId} prompt={prompt} subjects={subjects} onDone={() => setOpen(false)} />
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** Attach notes to a quiz that's already in the class. */
+export function AddNotesButton({ classId, quizId, title }: { classId: string; quizId: string; title: string }) {
+  const input = useRef<HTMLInputElement>(null);
+  const [pending, run] = useAction();
+  return (
+    <>
+      <Button variant="ghost" size="sm" disabled={pending} onClick={() => input.current?.click()} aria-label={`Joindre des notes à ${title}`}>
+        <PaperclipIcon />
+      </Button>
+      <input
+        ref={input}
+        type="file"
+        multiple
+        accept=".pdf,.txt,.md,.markdown,application/pdf,text/plain,text/markdown"
+        hidden
+        onChange={(e) => {
+          const files = [...(e.target.files ?? [])];
+          e.target.value = "";
+          if (!files.length) return;
+          const form = new FormData();
+          for (const f of files) form.append("notes", f);
+          run(() => addNotes(classId, quizId, form), files.length > 1 ? "Notes ajoutées" : "Note ajoutée");
+        }}
+      />
+    </>
+  );
+}
+
+export function DeleteNoteButton({ classId, noteId, name }: { classId: string; noteId: string; name: string }) {
+  const [, run] = useAction();
+  return (
+    <ConfirmDialog
+      title={`Supprimer « ${name} » ?`}
+      description="Le fichier de notes est supprimé pour toute la classe. Le quiz reste."
+      onConfirm={() => run(() => deleteNote(classId, noteId), "Fichier supprimé")}
+      trigger={
+        <Button variant="ghost" size="sm" aria-label={`Supprimer ${name}`}>
+          <Trash2Icon />
+        </Button>
+      }
+    />
   );
 }
 
@@ -252,6 +426,7 @@ export function OwnerQuizActions({ classId, quiz }: { classId: string; quiz: { i
   const [pending, run] = useAction();
   return (
     <div className="flex shrink-0 gap-1">
+      <AddNotesButton classId={classId} quizId={quiz.id} title={quiz.title} />
       <Button
         variant="ghost"
         size="sm"

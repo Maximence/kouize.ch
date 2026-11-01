@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, isNotNull, ne } from "drizzle-orm";
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -8,16 +8,18 @@ import { hashPassword } from "@/lib/auth/password";
 import { rateLimiter } from "@/lib/auth/rate-limit";
 import {
   ADMIN_USER_ID,
-  adminPassword,
+  adminLoginEnabled,
+  checkAdminPassword,
   clientIp,
   createAdminSession,
   destroySession,
   isAdmin,
-  safeEqual,
+  setAdminPassword,
 } from "@/lib/auth/session";
 import { CLASS_CODE_RE, cleanDisplayName, normalizeClassCode, removeMember, rotatePublishToken } from "@/lib/classes";
 import { db } from "@/lib/db";
-import { categories, classMembers, classes, quizzes } from "@/lib/db/schema";
+import { categories, classMembers, classes, quizNotes, quizzes } from "@/lib/db/schema";
+import { pruneNoteAssets } from "@/lib/notes";
 import { receiveQuiz } from "@/lib/publish/receive";
 import { QuizExport } from "@/lib/quiz/portable";
 import { isHosted } from "@/lib/settings";
@@ -28,12 +30,23 @@ const loginLimit = rateLimiter(10, 15 * 60 * 1000);
 
 export async function adminLogin(_prev: FormState, form: FormData): Promise<FormState> {
   if (!isHosted()) redirect("/");
-  const expected = adminPassword();
-  if (!expected) return { error: "La connexion admin est désactivée : définis KOUIZE_ADMIN_PASSWORD sur le serveur et redémarre-le." };
+  if (!adminLoginEnabled()) return { error: "La connexion admin est désactivée : définis KOUIZE_ADMIN_PASSWORD sur le serveur et redémarre-le." };
   if (!loginLimit.take(await clientIp())) return { error: "Trop d'essais. Attends 15 minutes et réessaie." };
-  if (!safeEqual(String(form.get("password") ?? ""), expected)) return { error: "Mot de passe incorrect." };
+  if (!(await checkAdminPassword(String(form.get("password") ?? "")))) return { error: "Mot de passe incorrect." };
   await createAdminSession();
   redirect("/admin");
+}
+
+/** Change the admin password. Other admin sessions are logged out. */
+export async function changeAdminPassword(current: string, next: string): Promise<ActionResult> {
+  const denied = await guard();
+  if (denied) return fail(denied);
+  if (!loginLimit.take(await clientIp())) return fail("Trop d'essais. Attends 15 minutes et réessaie.");
+  if (!(await checkAdminPassword(current))) return fail("Le mot de passe actuel est incorrect.");
+  if (next.length < 10) return fail("Utilise un nouveau mot de passe d'au moins 10 caractères.");
+  if (next.length > 200) return fail("Ce mot de passe est trop long.");
+  await setAdminPassword(next);
+  return ok();
 }
 
 export async function adminLogout() {
@@ -138,6 +151,40 @@ export async function renamePlayer(classId: string, playerId: string, rawName: s
     .set({ displayName: name.name, nameKey: name.key })
     .where(and(eq(classMembers.classId, classId), eq(classMembers.playerId, playerId)))
     .run();
+  refresh();
+  return ok();
+}
+
+/** Delete any class (yours or a student's) with its quizzes, results, invitations and notes. */
+export async function adminDeleteClass(id: string): Promise<ActionResult> {
+  const denied = await guard();
+  if (denied) return fail(denied);
+  const cls = db.select().from(classes).where(eq(classes.id, id)).get();
+  if (!cls) return fail("Classe introuvable");
+  db.transaction((tx) => {
+    tx.delete(classes).where(eq(classes.id, id)).run();
+    // Its quizzes (and their attempts and notes) live in its hidden subject.
+    tx.delete(categories).where(eq(categories.id, cls.categoryId)).run();
+  });
+  pruneNoteAssets();
+  redirect("/admin");
+}
+
+/** Delete any quiz of any class, with its attempts and notes. */
+export async function adminDeleteQuiz(quizId: string): Promise<ActionResult> {
+  const denied = await guard();
+  if (denied) return fail(denied);
+  db.delete(quizzes).where(and(eq(quizzes.id, quizId), isNotNull(quizzes.classId))).run();
+  pruneNoteAssets();
+  refresh();
+  return ok();
+}
+
+export async function adminDeleteNote(noteId: string): Promise<ActionResult> {
+  const denied = await guard();
+  if (denied) return fail(denied);
+  db.delete(quizNotes).where(eq(quizNotes.id, noteId)).run();
+  pruneNoteAssets();
   refresh();
   return ok();
 }

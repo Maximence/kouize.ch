@@ -2,7 +2,7 @@ import { sql } from "drizzle-orm";
 import { LogOutIcon, PlusIcon } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
-import { ClassDialog, PublishTokenButton } from "@/components/admin-forms";
+import { AdminPasswordForm, ClassDialog, PublishTokenButton } from "@/components/admin-forms";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -100,6 +100,18 @@ async function AdminContent() {
         </CardHeader>
         <CardContent>
           <PublishTokenButton exists={hasPublishToken()} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Mot de passe admin</CardTitle>
+          <CardDescription>
+            Remplace celui de KOUIZE_ADMIN_PASSWORD. Les autres sessions admin sont déconnectées.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <AdminPasswordForm />
         </CardContent>
       </Card>
     </div>

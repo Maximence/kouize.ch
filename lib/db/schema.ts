@@ -451,6 +451,28 @@ export const categoryImages = sqliteTable(
   (t) => [primaryKey({ columns: [t.categoryId, t.name] })],
 );
 
+/** Course notes (PDF, text, Markdown) a member uploaded with a quiz, readable by the class. */
+export const quizNotes = sqliteTable(
+  "quiz_notes",
+  {
+    id: id(),
+    quizId: text("quiz_id")
+      .notNull()
+      .references(() => quizzes.id, { onDelete: "cascade" }),
+    assetId: text("asset_id")
+      .notNull()
+      .references(() => assets.id),
+    /** The uploaded file name, as shown in the class. */
+    name: text("name").notNull(),
+    mime: text("mime").notNull(),
+    bytes: integer("bytes").notNull(),
+    /** players.id of who uploaded it. */
+    uploadedBy: text("uploaded_by"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("quiz_notes_quiz").on(t.quizId)],
+);
+
 // ---------- Students' suggestions (online copy) ----------
 
 export type SuggestionKind = "wrong-answer" | "unclear" | "typo" | "other";

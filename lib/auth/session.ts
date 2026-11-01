@@ -5,7 +5,8 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { db } from "@/lib/db";
-import { LOCAL_USER_ID, sessions, users } from "@/lib/db/schema";
+import { LOCAL_USER_ID, sessions, settings, users } from "@/lib/db/schema";
+import { hashPassword, verifyPassword } from "./password";
 import { isHosted } from "@/lib/settings";
 import { SESSION_COOKIE, USER_COOKIE } from "./cookie";
 
@@ -25,10 +26,41 @@ export function safeEqual(a: string, b: string): boolean {
   return timingSafeEqual(Buffer.from(hashToken(a), "hex"), Buffer.from(hashToken(b), "hex"));
 }
 
-/** The admin password from the environment, or null when admin login is disabled. */
+/** The admin password from the environment, or null when it isn't set. */
 export function adminPassword(): string | null {
   const p = process.env.KOUIZE_ADMIN_PASSWORD?.trim();
   return p ? p : null;
+}
+
+const ADMIN_HASH_KEY = "admin.passwordHash";
+
+/**
+ * The password changed from the admin page (hashed), which replaces
+ * KOUIZE_ADMIN_PASSWORD. KOUIZE_ADMIN_RESET=1 ignores it, to get back in with the
+ * environment's password after forgetting it.
+ */
+function storedAdminHash(): string | null {
+  if (process.env.KOUIZE_ADMIN_RESET === "1") return null;
+  return db.select().from(settings).where(eq(settings.key, ADMIN_HASH_KEY)).get()?.value ?? null;
+}
+
+export const adminLoginEnabled = () => Boolean(storedAdminHash() ?? adminPassword());
+
+export async function checkAdminPassword(password: string): Promise<boolean> {
+  const hash = storedAdminHash();
+  if (hash) return verifyPassword(password, hash);
+  const expected = adminPassword();
+  return Boolean(expected) && safeEqual(password, expected!);
+}
+
+/** Save a new admin password and log out every other admin session (Server Actions only). */
+export async function setAdminPassword(password: string) {
+  const value = await hashPassword(password);
+  db.insert(settings).values({ key: ADMIN_HASH_KEY, value }).onConflictDoUpdate({ target: settings.key, set: { value } }).run();
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  db.delete(sessions)
+    .where(and(eq(sessions.userId, ADMIN_USER_ID), ne(sessions.id, token ? hashToken(token) : "")))
+    .run();
 }
 
 /** True when the request carries a valid admin session. Looked up once per render. */
